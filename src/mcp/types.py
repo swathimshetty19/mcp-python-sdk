@@ -2005,6 +2005,7 @@ class CheckpointHandle(BaseModel):
     handle: str
     digest: str
     ttlSeconds: int
+    summary: str
 
 
 class CheckpointCreateParams(BaseModel):
@@ -2022,6 +2023,7 @@ class CheckpointCreateResult(BaseModel):
     handle: str
     digest: str
     ttlSeconds: int
+    summary: str
 
 
 class CheckpointValidateParams(BaseModel):
@@ -2060,3 +2062,22 @@ class CheckpointDeleteParams(BaseModel):
 class CheckpointDeleteResult(BaseModel):
     """Result of checkpoint/delete."""
     deleted: bool
+
+class CheckpointLookupParams(BaseModel):
+    """Params for checkpoint/lookup.
+
+    Allows a client to resolve a logical label or session-scoped identifier
+    into a concrete checkpoint handle.
+    """
+    label: str | None = None
+    handle: str | None = None
+
+
+class CheckpointLookupResult(BaseModel):
+    """Result of checkpoint/lookup."""
+    found: bool
+    handle: str | None = None
+    digest: str | None = None
+    ttlSeconds: int | None = None
+    summary: str | None = None
+

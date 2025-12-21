@@ -15,6 +15,8 @@ from mcp.types import (
     CheckpointResumeResult,
     CheckpointDeleteParams,
     CheckpointDeleteResult,
+    CheckpointLookupParams,
+    CheckpointLookupResult,
 )
 
 
@@ -33,6 +35,12 @@ class CheckpointBackend(Protocol):
         session: ServerSession,
         params: CheckpointValidateParams,
     ) -> CheckpointValidateResult: ...
+
+    async def lookup_checkpoint(
+        self,
+        session: ServerSession,
+        params: CheckpointLookupParams,
+    ) -> CheckpointLookupResult: ...
 
     async def resume_checkpoint(
         self,
@@ -64,6 +72,7 @@ class InMemoryCheckpointBackend(CheckpointBackend):
     def __init__(self, ttl_seconds: int = 1800) -> None:
         self._ttl = ttl_seconds
         self._handles: dict[str, InMemoryHandleEntry] = {}
+        self._labels: dict[str, str] = {}
 
     def _now(self) -> float:
         return time.time()
@@ -110,6 +119,35 @@ class InMemoryCheckpointBackend(CheckpointBackend):
                 params.expectedDigest is None
                 or params.expectedDigest == entry.digest
             ),
+        )
+
+    async def lookup_checkpoint(
+        self,
+        session: ServerSession,
+        params: CheckpointLookupParams,
+    ) -> CheckpointLookupResult:
+        # Resolve handle directly or via label
+        handle = params.handle
+        if handle is None and params.label is not None:
+            handle = self._labels.get(params.label)
+
+        if handle is None:
+            return CheckpointLookupResult(found=False)
+
+        entry = self._handles.get(handle)
+        if not entry:
+            return CheckpointLookupResult(found=False)
+
+        now = self._now()
+        if now >= entry.expires_at:
+            return CheckpointLookupResult(found=False)
+
+        return CheckpointLookupResult(
+            found=True,
+            handle=handle,
+            digest=entry.digest,
+            ttlSeconds=int(entry.expires_at - now),
+            summary=None,
         )
 
     async def resume_checkpoint(
